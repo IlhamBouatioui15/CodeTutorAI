@@ -139,9 +139,41 @@ def execute_code(req: CodeRequest):
         output = result.get("run", {}).get("output", "")
 
         if not output:
-            output = "✅ Aucun résultat."
+            output = "Aucun résultat."
 
         return {"output": output.strip()}
 
     except Exception as e:
         return {"output": f"Erreur API Piston : {e}"}
+
+
+class QuizRequest(BaseModel):
+    tutorial_text: str  # texte du tutoriel à partir duquel générer le quiz
+
+
+@app.post("/generate_quiz")
+def generate_quiz(req: QuizRequest):
+    prompt = f"""
+    Génère un quiz de 10 questions à choix multiples à partir de ce tutoriel :
+    {req.tutorial_text}
+    Réponds UNIQUEMENT au format JSON suivant :
+    {{
+        "quiz_title": "Quiz sur le tutoriel",
+        "questions": [
+            {{
+                "question": "...",
+                "options": ["...","...","...","..."],
+                "answer": 0
+            }}
+        ]
+    }}
+    """
+    try:
+        response = model.generate_content(prompt)
+        # NETTOYAGE : Enlève les balises ```json si Gemini les ajoute
+        raw_text = response.text.strip().replace("```json", "").replace("```", "")
+        quiz_json = json.loads(raw_text)
+        return {"quiz": quiz_json}
+    except Exception as e:
+        print(f"Erreur : {e}")
+        return {"quiz": {}, "error": str(e)}
