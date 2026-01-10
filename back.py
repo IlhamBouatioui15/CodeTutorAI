@@ -25,13 +25,19 @@ MODEL_NAME = "gemini-flash-latest"
 model = genai.GenerativeModel(
     model_name=MODEL_NAME,
     system_instruction=(
-        "Tu es un assistant expert en programmation. "
-        "Ta mission est de produire des TUTORIELS COMPLETS, STRUCTURÉS et PROGRESSIFS "
-        "en 3 niveaux :\n\n"
-        "1) Débutant : explication simple, pas à pas, analogies, notions fondamentales, prérequis.\n"
-        "2) Intermédiaire : exemples pratiques complets, exercices guidés, erreurs courantes.\n"
-        "3) Avancé : architecture pro, bonnes pratiques, optimisation, mini-projet.\n\n"
-        "Tu écris dans un style clair, pédagogique, avec des exemples de code commentés." )
+        "Tu es un tuteur IA spécialisé EXCLUSIVEMENT en programmation et informatique. "
+        "CONSIGNE DE SÉCURITÉ CRUCIALE : Si la question de l'utilisateur ne concerne pas la programmation, "
+        "le développement logiciel, l'algorithmique ou l'informatique, tu dois refuser de répondre. "
+        "Dans ce cas, utilise exactement cette phrase : 'Désolé, je suis un tuteur spécialisé uniquement en programmation. "
+        "Je ne peux pas répondre à cette question ou demande hors de mon domaine d'expertise.'\n\n"
+        
+        "Si la demande concerne la programmation, ta mission est de produire des TUTORIELS COMPLETS, STRUCTURÉS et PROGRESSIFS "
+        "en 3 niveaux :\n"
+        "1) Débutant : explication simple, analogies, notions fondamentales.\n"
+        "2) Intermédiaire : exemples pratiques, exercices guidés, erreurs courantes.\n"
+        "3) Avancé : architecture, bonnes pratiques, optimisation.\n\n"
+        "Tu écris dans un style clair et pédagogique."
+    )
 )
 # --- FASTAPI ---
 app = FastAPI(title="Backend Chat IA")
@@ -54,17 +60,26 @@ retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"
 
 prompt_template = PromptTemplate(
     input_variables=["context", "question"],
-    template=
-        "CONTEXT DOCUMENTAIRE RAG :\n{context}\n\n"
+    template=(
+        "ÉVALUATION DU SUJET :\n"
+        "La question suivante porte-t-elle sur la programmation ou l'informatique ?\n"
         "QUESTION UTILISATEUR : {question}\n\n"
-        "=== CONSIGNES ===\n"
-        "Tu dois produire un TUTORIEL COMPLET en respectant la structure suivante :\n"
+        
+        "=== INSTRUCTIONS ===\n"
+        "1. SI LE SUJET N'EST PAS LA PROGRAMMATION : Réponds uniquement que tu es un tuteur de programmation et refuse la demande.\n"
+        "2. SI LE SUJET EST LA PROGRAMMATION : Utilise le CONTEXTE DOCUMENTAIRE RAG ci-dessous (si pertinent) et génère un TUTORIEL COMPLET.\n\n"
+        
+        "CONTEXT DOCUMENTAIRE RAG :\n{context}\n\n"
+        
+        "STRUCTURE DU TUTORIEL (Si applicable) :\n"
         "1. Contexte général et but du tutoriel\n"
         "2. Niveau Débutant : bases + exemples simples\n"
         "3. Niveau Intermédiaire : exercices + mini-projet guidé\n"
-        "4. Niveau Avancé : concepts experts + optimisation + projet avancé\n"
+        "4. Niveau Avancé : concepts experts + optimisation\n"
         "5. Résumé + exercices finaux\n\n"
-        "=== RÉPONSE EXPERTE ===\n"
+        
+        "=== RÉPONSE ===\n"
+    )
 )
 
 
@@ -97,12 +112,10 @@ LANGUAGE_MAP = {
     "python": "python",
     "javascript": "javascript",
     "c": "c",
-    "cpp": "cpp",
     "java": "java",
     "go": "go",
     "ruby": "ruby",
-    "php": "php",
-    "swift": "swift"
+    "php": "php"
 }
 
 
@@ -111,7 +124,7 @@ def execute_code(req: CodeRequest):
 
     language = req.language.lower()
 
-    if language not in ["python", "javascript", "java", "c", "cpp", "go", "rust", "ruby", "php"]:
+    if language not in ["python", "javascript", "java", "c", "go", "ruby", "php"]:
         return {"output": f"Langage {req.language} non supporté."}
 
     payload = {

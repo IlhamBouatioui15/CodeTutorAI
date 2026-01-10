@@ -2,41 +2,81 @@ import streamlit as st
 import requests
 from streamlit_monaco_editor import st_monaco
 
+# --- CONFIGURATION ---
+st.set_page_config(page_title="Tuteur IA - Code & Chat", page_icon="🐍", layout="wide")
+
 API_CHAT = "http://127.0.0.1:8000/chat"
 API_EXEC = "http://127.0.0.1:8000/execute"
-API_QUIZ = "http://127.0.0.1:8000/generate_quiz"
 
-st.set_page_config(page_title="Chat & IDE", layout="wide")
+# --- STYLE CSS (Inspiré de l'accueil) ---
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+    }
 
-# ------------------------------------------------------------
-# NAVIGATION
-# ------------------------------------------------------------
-st.sidebar.title("Navigation")
-if st.sidebar.button("🏠 Accueil"):
-    st.switch_page("home.py")
-if st.sidebar.button("📝 Quiz"):
-    st.switch_page("pages/quiz.py")
+    /* Header stylisé plus compact */
+    .chat-header {
+        background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+        padding: 20px;
+        border-radius: 15px;
+        color: white;
+        text-align: center;
+        margin-bottom: 25px;
+    }
 
-st.title("Chatbot + IDE")
+    /* Conteneur pour l'IDE et le Chat */
+    .stColumn > div {
+        background-color: #ffffff;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        border: 1px solid #f0f2f6;
+    }
 
-# SESSION
+    /* Style du bouton Run */
+    .stButton>button {
+        width: 100%;
+        border-radius: 20px;
+        font-weight: bold;
+    }
+    
+    /* Style spécifique pour la zone de résultat */
+    .result-box {
+        background-color: #1e1e1e;
+        color: #d4d4d4;
+        padding: 15px;
+        border-radius: 10px;
+        font-family: 'Courier New', monospace;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- INITIALISATION SESSION ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "last_tutorial" not in st.session_state:
     st.session_state.last_tutorial = ""
 
+# --- HEADER ---
+st.markdown("""
+    <div class="chat-header">
+        <h2 style="margin:0;">💻 Espace de Travail Interactif</h2>
+        <p style="margin:0; opacity:0.9;">Apprenez avec l'IA et testez votre code en temps réel</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# --- LAYOUT PRINCIPAL ---
+col_ide, col_chat = st.columns([1, 1.4], gap="large")
 
 # ------------------------------------------------------------
-# LAYOUT
-# ------------------------------------------------------------
-col_ide, col_chat = st.columns([1, 1.6])
-
-# ------------------------------------------------------------
-# IDE
+# SECTION IDE (GAUCHE)
 # ------------------------------------------------------------
 with col_ide:
-    st.subheader("IDE Multilangage")
-
+    st.markdown("### 🛠️ IDE Multilangage")
+    
     LANGAGES = {
         "Python": "python",
         "JavaScript": "javascript",
@@ -46,74 +86,113 @@ with col_ide:
         "Ruby": "ruby",
         "PHP": "php",
     }
-
-    langage = st.selectbox("Choisir un langage :", list(LANGAGES.keys()))
-    monaco_lang = LANGAGES[langage]
-
+    
+    langage = st.selectbox("Langage de programmation", list(LANGAGES.keys()))
+    
     code_default = {
         "Python": "print('Hello Python!')",
         "JavaScript": "console.log('Hello JS!')",
-        "C": "#include <stdio.h>\nint main(){ printf(\"Hello C!\"); return 0; }",
-        "Java": "class Main{ public static void main(String[] args){ System.out.println(\"Hello Java!\"); }}",
-        "Go": "package main\nimport \"fmt\"\nfunc main(){ fmt.Println(\"Hello Go!\") }",
+        "C": "#include <stdio.h>\nint main() {\n    printf(\"Hello C!\");\n    return 0;\n}",
+        "Java": "public class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Hello Java!\");\n    }\n}",
+        "Go": "package main\nimport \"fmt\"\nfunc main() {\n    fmt.Println(\"Hello Go!\")\n}",
         "Ruby": "puts 'Hello Ruby!'",
         "PHP": "<?php echo 'Hello PHP!'; ?>"
     }
 
+    # Editor Monaco
     code = st_monaco(
         value=code_default[langage],
-        language=monaco_lang,
+        language=LANGAGES[langage],
         theme="vs-dark",
-        height="350px"
+        height="400px"
     )
 
-    if st.button("▶️ Run", type="primary"):
-        try:
-            res = requests.post(API_EXEC, json={
-                "language": langage.lower(),
-                "code": code
-            })
-            if res.status_code == 200:
-                st.subheader("Résultat :")
-                st.code(res.json().get("output", ""))
-            else:
-                st.error(f"Erreur API : {res.text}")
-        except Exception as e:
-            st.error(f"Erreur de communication : {e}")
+    if st.button("Exécuter le code", type="primary"):
+        with st.spinner("Exécution..."):
+            try:
+                res = requests.post(API_EXEC, json={
+                    "language": langage.lower(),
+                    "code": code
+                })
+                if res.status_code == 200:
+                    st.markdown(" **Résultat :**")
+                    output = res.json().get("output", "Aucune sortie")
+                    st.code(output, language=LANGAGES[langage])
+                else:
+                    st.error("Erreur lors de l'exécution.")
+            except Exception as e:
+                st.error(f"Erreur API : {e}")
 
 
 # ------------------------------------------------------------
-# CHATBOT
+# SECTION CHATBOT (DROITE)
 # ------------------------------------------------------------
 with col_chat:
-    st.subheader("Chat")
+    st.markdown('<div class="column-card">', unsafe_allow_html=True)
+    st.markdown("### 🤖 Tuteur IA")
+    
+    # LE CONTENEUR SCROLLABLE : 
+    # C'est ici que tout se passe. On fixe la hauteur (ex: 550px).
+    # Seul ce bloc défilera si le tutoriel est long.
+    chat_container = st.container(height=550)
 
-    chat_box = st.empty()
-    with chat_box.container():
+    with chat_container:
+        # Affichage de tous les messages (y compris le long tutoriel)
         for msg in st.session_state.messages:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
 
-    if prompt := st.chat_input("Pose ta question..."):
+    # L'input reste en bas, à l'intérieur du cadre blanc mais hors du container scrollable
+    if prompt := st.chat_input("Posez votre question (ex: Tutoriel Python débutant)"):
+        # 1. Ajouter le message utilisateur
         st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("assistant"):
-            res = requests.post(API_CHAT, json={"message": prompt})
-            ai = res.json()["response"]
-            st.session_state.last_tutorial = ai
-            st.session_state.messages.append({"role": "assistant", "content": ai})
-            st.markdown(ai)
+        
+        # 2. Afficher immédiatement dans le container
+        with chat_container:
+            with st.chat_message("user"):
+                st.markdown(prompt)
 
+            # 3. Appel API et affichage de la réponse (Tutoriel)
+            with st.chat_message("assistant"):
+                with st.spinner("Le tuteur rédige votre tutoriel..."):
+                    try:
+                        res = requests.post(API_CHAT, json={"message": prompt})
+                        if res.status_code == 200:
+                            ai_response = res.json()["response"]
+                            st.markdown(ai_response) # Le tutoriel s'affiche ici
+                            
+                            # Sauvegarde
+                            st.session_state.last_tutorial = ai_response
+                            st.session_state.messages.append({"role": "assistant", "content": ai_response})
+                        else:
+                            st.error("Erreur technique.")
+                    except Exception as e:
+                        st.error(f"Erreur de connexion : {e}")
+        
+        # Petit hack pour forcer le scroll vers le bas après la réponse
+        st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------------------------
-# Bouton pour aller au quiz
+# ACTION FOOTER : GÉNÉRATION DU QUIZ
 # ------------------------------------------------------------
 st.write("---")
-if st.button("🎯 Générer un Quiz à partir du tutoriel"):
-    if not st.session_state.last_tutorial:
-        st.warning("Aucun tutoriel trouvé.")
-    else:
-        # On enregistre simplement le texte puis on change de page
-        st.sidebar.success("Quiz généré, direction la page Quiz !")
-        st.switch_page("pages/quiz.py")
-        st.write("---")
+col_info, col_btn = st.columns([2, 1])
 
+with col_info:
+    if st.session_state.last_tutorial:
+        st.success("Un tutoriel est prêt ! Vous pouvez maintenant tester vos connaissances.")
+    else:
+        st.info("Posez une question pour générer un tutoriel et débloquer le quiz.")
+
+with col_btn:
+    if st.button("Passer au Quiz de Validation", use_container_width=True):
+        if not st.session_state.last_tutorial:
+            st.warning("Veuillez d'abord générer un tutoriel avec le chatbot.")
+        else:
+            # Nettoyage de l'ancien quiz pour forcer la regénération sur la page Quiz
+            if "generated_quiz" in st.session_state:
+                del st.session_state.generated_quiz
+            
+            st.switch_page("pages/quiz.py")
