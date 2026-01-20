@@ -1,9 +1,0 @@
-# Python
-_pycache_/
-*.pyc
-*.pyo
-*.pyd
-env/
-.nvenv/
-*.env
-geeks_texts.json
